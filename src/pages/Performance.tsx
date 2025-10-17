@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 // Tipe untuk data performa yang sudah diproses
 type PerformanceData = {
   date: string;
-  followers: number;
+  [key: string]: any; // Memungkinkan metrik dinamis
 };
 
 // Fungsi untuk mengambil dan memproses data log performa
@@ -17,8 +17,6 @@ async function fetchPerformanceData(): Promise<PerformanceData[]> {
   const { data, error } = await supabase
     .from("performance_logs")
     .select("date, metric, value")
-    // Kita hanya ambil metrik 'followers' untuk contoh ini
-    .eq("metric", "total_followers") 
     .order("date", { ascending: true });
 
   if (error) {
@@ -26,21 +24,28 @@ async function fetchPerformanceData(): Promise<PerformanceData[]> {
     throw new Error("Failed to fetch performance data");
   }
 
-  // Memformat data agar sesuai dengan kebutuhan grafik
-  const formattedData = data.map(log => ({
-    // Format tanggal menjadi lebih pendek dan mudah dibaca (mis: "Oct 17")
-    date: format(new Date(log.date), "MMM d"),
-    followers: log.value,
-  }));
+  // Mengelompokkan data berdasarkan tanggal
+  const dataByDate = data.reduce((acc, log) => {
+    const date = format(new Date(log.date), "MMM d");
+    if (!acc[date]) {
+      acc[date] = { date };
+    }
+    acc[date][log.metric] = log.value;
+    return acc;
+  }, {} as Record<string, PerformanceData>);
 
-  return formattedData;
+  return Object.values(dataByDate);
 }
 
 // Konfigurasi untuk komponen Chart kita
 const chartConfig = {
-  followers: {
+  total_followers: {
     label: "Followers",
     color: "hsl(var(--teal))",
+  },
+  engagement_rate: {
+    label: "Engagement Rate",
+    color: "hsl(var(--gold))",
   },
 };
 
@@ -59,68 +64,111 @@ export default function Performance() {
         </p>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Total Followers Trend</CardTitle>
-          <CardDescription>Showing total followers growth for the last period.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center h-[350px]">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : isError ? (
-            <div className="flex justify-center items-center h-[350px] text-destructive">
-              <p>Failed to load chart data.</p>
-            </div>
-          ) : performanceData && performanceData.length > 0 ? (
-            <div className="h-[350px]">
-              <ChartContainer config={chartConfig}>
-                <LineChart
-                  accessibilityLayer
-                  data={performanceData}
-                  margin={{
-                    top: 5,
-                    right: 20,
-                    left: 10,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.toLocaleString()}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="line" />}
-                  />
-                  <Line
-                    dataKey="followers"
-                    type="monotone"
-                    stroke="var(--color-followers)"
-                    strokeWidth={2}
-                    dot={true}
-                  />
-                </LineChart>
-              </ChartContainer>
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-[350px]">
-               <p className="text-muted-foreground">No performance data available to display.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Followers Trend</CardTitle>
+            <CardDescription>Showing total followers growth for the last period.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-[350px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : isError ? (
+              <div className="flex justify-center items-center h-[350px] text-destructive">
+                <p>Failed to load chart data.</p>
+              </div>
+            ) : performanceData && performanceData.length > 0 ? (
+              <div className="h-[350px]">
+                <ChartContainer config={chartConfig}>
+                  <LineChart
+                    accessibilityLayer
+                    data={performanceData}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                  >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tickFormatter={(value) => value.toLocaleString()}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent indicator="line" />}
+                    />
+                    <Line
+                      dataKey="total_followers"
+                      type="monotone"
+                      stroke="var(--color-total_followers)"
+                      strokeWidth={2}
+                      dot={true}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              </div>
+            ) : (
+              <div className="flex justify-center items-center h-[350px]">
+                 <p className="text-muted-foreground">No performance data available to display.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Engagement Rate</CardTitle>
+            <CardDescription>Showing daily engagement rate.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-[350px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : isError ? (
+              <div className="flex justify-center items-center h-[350px] text-destructive">
+                <p>Failed to load chart data.</p>
+              </div>
+            ) : performanceData && performanceData.length > 0 ? (
+              <div className="h-[350px]">
+                <ChartContainer config={chartConfig}>
+                  <BarChart accessibilityLayer data={performanceData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <YAxis 
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent />}
+                    />
+                    <Bar dataKey="engagement_rate" fill="var(--color-engagement_rate)" radius={4} />
+                  </BarChart>
+                </ChartContainer>
+              </div>
+            ) : (
+              <div className="flex justify-center items-center h-[350px]">
+                 <p className="text-muted-foreground">No engagement data available.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
