@@ -19,12 +19,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { Division } from "@/lib/auth";
 
-// Skema dasar validasi
+// Skema validasi (tidak ada perubahan di sini)
 const baseSchema = z.object({
     notes: z.string().optional(),
 });
 
-// Skema spesifik untuk setiap divisi
 const creatorSchema = baseSchema.extend({
     video_count: z.coerce.number().min(0, "Jumlah video tidak boleh negatif."),
     post_count: z.coerce.number().min(0, "Jumlah postingan tidak boleh negatif."),
@@ -39,7 +38,6 @@ const modelSchema = baseSchema.extend({
     project_name: z.string().min(3, "Nama proyek minimal 3 karakter."),
 });
 
-// Fungsi untuk mendapatkan skema yang tepat berdasarkan divisi
 const getValidationSchema = (division: Division | null | undefined) => {
     switch (division) {
         case "konten_kreator":
@@ -75,24 +73,49 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
         },
     });
 
+    // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
     const mutation = useMutation({
         mutationFn: async (values: FormValues) => {
             if (!user || !division) throw new Error("User not authenticated or division not set");
 
             const today = new Date().toISOString().split('T')[0];
-            const meta = { ...values };
-            delete (meta as any).notes; // Hapus catatan dari meta jika ada
+            const { notes, ...metrics } = values;
 
-            const dataToInsert = {
+            // Siapkan data untuk dimasukkan ke database
+            const dataToInsert = Object.entries(metrics).map(([key, value]) => ({
                 date: today,
                 user_id: user.id,
                 division: division,
-                metric: 'daily_report',
-                value: 1, // Nilai 1 untuk menandakan 1 laporan
-                meta: meta,
-            };
+                metric: key,
+                value: typeof value === 'string' ? 0 : value, // Jika string (cth: project_name), value numeriknya 0
+                meta: {
+                    // Simpan nilai asli di meta, terutama untuk string
+                    original_value: value,
+                    // Tambahkan catatan hanya pada entri pertama
+                    ...(Object.keys(metrics)[0] === key && notes && { notes }),
+                },
+            }));
+            
+            // Jika tidak ada metrik spesifik, simpan saja catatannya
+            if (dataToInsert.length === 0 && notes) {
+                 dataToInsert.push({
+                    date: today,
+                    user_id: user.id,
+                    division: division,
+                    metric: 'daily_notes',
+                    value: 0,
+                    meta: { notes },
+                 });
+            }
 
-            const { error } = await supabase.from("performance_logs").insert([dataToInsert]);
+
+            if(dataToInsert.length === 0) {
+                toast.info("Tidak ada data untuk dilaporkan.");
+                return;
+            }
+
+            const { error } = await supabase.from("performance_logs").insert(dataToInsert);
+
             if (error) {
                 throw new Error(error.message);
             }
@@ -100,6 +123,7 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
         onSuccess: () => {
             toast.success("Laporan harian berhasil dikirim!");
             queryClient.invalidateQueries({ queryKey: ["dailyReports", user?.id] });
+            queryClient.invalidateQueries({ queryKey: ["dashboardStats", user?.id] }); // <-- Invalidate data dasbor
             onSuccess();
             form.reset();
         },
@@ -107,11 +131,13 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
             toast.error(`Gagal mengirim laporan: ${error.message}`);
         },
     });
+    // --- PERUBAHAN UTAMA BERAKHIR DI SINI ---
 
     function onSubmit(data: FormValues) {
         mutation.mutate(data);
     }
-
+    
+    // ... sisa kode (render form) tetap sama ...
     const renderDivisionFields = () => {
         switch (division) {
             case "konten_kreator":
