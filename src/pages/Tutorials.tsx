@@ -1,10 +1,20 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AddTutorialForm } from "@/components/AddTutorialForm"; // <-- Impor baru
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlusCircle, Youtube, FileText, Link as LinkIcon } from "lucide-react";
 
@@ -49,6 +59,7 @@ async function fetchTutorials(): Promise<Tutorial[]> {
 
 export default function Tutorials() {
   const { isManager } = useAuth();
+  const [isAddTutorialOpen, setIsAddTutorialOpen] = useState(false);
   const { data: tutorials, isLoading, isError } = useQuery({
     queryKey: ['tutorials'],
     queryFn: fetchTutorials,
@@ -65,10 +76,23 @@ export default function Tutorials() {
             </p>
             </div>
             {isManager && (
-                <Button disabled>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Tutorial
-                </Button>
+                <Dialog open={isAddTutorialOpen} onOpenChange={setIsAddTutorialOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Tutorial
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Create New Tutorial</DialogTitle>
+                            <DialogDescription>
+                                Fill in at least one content type: article, YouTube URL, or file URL.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <AddTutorialForm onSuccess={() => setIsAddTutorialOpen(false)} />
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
         
