@@ -4,51 +4,85 @@ import { BarChart3, TrendingUp, Users, Target, AlertCircle, Loader2 } from "luci
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 // Fungsi untuk mengambil data statistik dari Supabase
-async function fetchDashboardStats() {
-  // Kita akan mengambil beberapa data sekaligus
+async function fetchDashboardStats(userId?: string) {
+  if (!userId) return null;
+
+  // 1. Ambil data statistik umum
   const { data: accounts, error: accountsError } = await supabase
     .from("accounts")
     .select("followers, status");
-
-  if (accountsError) {
-    throw new Error("Could not fetch account data");
-  }
+  if (accountsError) throw new Error("Could not fetch account data");
 
   const { data: teamMembers, error: teamMembersError } = await supabase
     .from("team_members")
     .select("id");
-
-  if (teamMembersError) {
-    throw new Error("Could not fetch team data");
-  }
+  if (teamMembersError) throw new Error("Could not fetch team data");
   
-  // Kalkulasi sederhana dari data yang didapat
+  // Kalkulasi statistik umum
   const totalFollowers = accounts.reduce((acc, account) => acc + (account.followers || 0), 0);
   const activeAccounts = accounts.filter(account => account.status === 'active').length;
   const issues = accounts.filter(account => account.status === 'pelanggaran' || account.status === 'banned').length;
-  
-  // Skor performa dummy, kita bisa kembangkan nanti
-  const performanceScore = activeAccounts > 0 ? Math.round((activeAccounts / accounts.length) * 100) : 0;
+  const performanceScore = accounts.length > 0 ? Math.round((activeAccounts / accounts.length) * 100) : 0;
+
+  // 2. Ambil target harian untuk user saat ini
+  const today = new Date();
+  const { data: dailyTargets, error: targetsError } = await supabase
+    .from("kpi_targets")
+    .select("metric, target_value")
+    .eq("target_for_type", "user")
+    .eq("target_for_id", userId)
+    .eq("period", "daily")
+    .gte("start_date", format(startOfDay(today), 'yyyy-MM-dd'))
+    .lte("end_date", format(endOfDay(today), 'yyyy-MM-dd'));
+  if (targetsError) throw new Error("Could not fetch KPI targets");
+
+  const followersGoal = dailyTargets.find(t => t.metric === 'total_followers')?.target_value || 0;
+  const engagementGoal = dailyTargets.find(t => t.metric === 'engagement_rate')?.target_value || 0;
+
+  // 3. Ambil progres harian dari performance_logs
+  const { data: performanceLogs, error: logsError } = await supabase
+    .from("performance_logs")
+    .select("metric, value")
+    .eq("user_id", userId)
+    .eq("date", format(today, 'yyyy-MM-dd'));
+  if (logsError) throw new Error("Could not fetch performance logs");
+
+  const followersProgress = performanceLogs.find(l => l.metric === 'total_followers')?.value || 0;
+  const engagementProgress = performanceLogs.find(l => l.metric === 'engagement_rate')?.value || 0;
 
   return { 
     totalFollowers, 
     activeAccounts, 
     performanceScore, 
     issues,
-    totalTeamMembers: teamMembers.length
+    totalTeamMembers: teamMembers.length,
+    dailyGoals: {
+      followers: {
+        target: followersGoal,
+        progress: followersProgress,
+        percentage: followersGoal > 0 ? (followersProgress / followersGoal) * 100 : 0,
+      },
+      engagement: {
+        target: engagementGoal,
+        progress: engagementProgress,
+        percentage: engagementGoal > 0 ? (engagementProgress / engagementGoal) * 100 : 0,
+      }
+    }
   };
 }
 
 
 export default function Dashboard() {
-  const { userMetadata } = useAuth();
+  const { user, userMetadata } = useAuth();
 
-  // Menggunakan useQuery untuk mengambil dan menyimpan data
+  // Menggunakan useQuery untuk mengambil dan menyimpan data, sekarang bergantung pada user.id
   const { data: stats, isLoading, isError } = useQuery({
-    queryKey: ['dashboardStats'],
-    queryFn: fetchDashboardStats
+    queryKey: ['dashboardStats', user?.id],
+    queryFn: () => fetchDashboardStats(user?.id),
+    enabled: !!user // Hanya jalankan query jika user sudah tersedia
   });
 
   // Tampilan saat loading
@@ -88,7 +122,7 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-[hsl(var(--teal))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalFollowers.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{stats?.totalFollowers.toLocaleString() || 0}</div>
             <p className="text-xs text-muted-foreground">
               Across all accounts
             </p>
@@ -101,7 +135,7 @@ export default function Dashboard() {
             <BarChart3 className="h-4 w-4 text-[hsl(var(--gold))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeAccounts}</div>
+            <div className="text-2xl font-bold">{stats?.activeAccounts || 0}</div>
             <p className="text-xs text-muted-foreground">
               Ready for campaigns
             </p>
@@ -114,7 +148,7 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-[hsl(var(--teal))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.performanceScore}%</div>
+            <div className="text-2xl font-bold">{stats?.performanceScore || 0}%</div>
             <p className="text-xs text-muted-foreground">
               Based on account status
             </p>
@@ -127,7 +161,7 @@ export default function Dashboard() {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.issues}</div>
+            <div className="text-2xl font-bold">{stats?.issues || 0}</div>
             <p className="text-xs text-muted-foreground">
               Accounts needing attention
             </p>
@@ -146,16 +180,20 @@ export default function Dashboard() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Followers Goal</span>
-                <span className="font-medium">0 / 0</span>
+                <span className="font-medium">
+                    {stats?.dailyGoals.followers.progress.toLocaleString() || 0} / {stats?.dailyGoals.followers.target.toLocaleString() || 0}
+                </span>
               </div>
-              <Progress value={0} className="h-2" />
+              <Progress value={stats?.dailyGoals.followers.percentage || 0} className="h-2" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Engagement Goal</span>
-                <span className="font-medium">0 / 0</span>
+                <span className="font-medium">
+                    {stats?.dailyGoals.engagement.progress || 0}% / {stats?.dailyGoals.engagement.target || 0}%
+                </span>
               </div>
-              <Progress value={0} className="h-2" />
+              <Progress value={stats?.dailyGoals.engagement.percentage || 0} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -169,15 +207,15 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Team Members</span>
-                <span className="font-medium">{stats.totalTeamMembers}</span>
+                <span className="font-medium">{stats?.totalTeamMembers || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Active Accounts</span>
-                <span className="font-medium">{stats.activeAccounts}</span>
+                <span className="font-medium">{stats?.activeAccounts || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Avg Performance</span>
-                <span className="font-medium">{stats.performanceScore}%</span>
+                <span className="font-medium">{stats?.performanceScore || 0}%</span>
               </div>
             </div>
           </CardContent>
@@ -196,7 +234,6 @@ export default function Dashboard() {
         </Card>
       </div>
       
-      {/* ... (sisa kodenya tetap sama) ... */}
        <Card className="border-[hsl(var(--teal))]/20 bg-[hsl(var(--teal))]/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
