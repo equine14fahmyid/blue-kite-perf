@@ -25,6 +25,7 @@ import {
   Package,
   Menu,
   X,
+  ClipboardCheck, // <-- Impor ikon baru
   ClipboardEdit, // <-- Impor ikon baru
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ interface LayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Laporan Harian", href: "/daily-report", icon: ClipboardEdit, managerOnly: false },
+  { name: "Review Laporan", href: "/report-review", icon: ClipboardCheck, managerOnly: true }, // <-- Tambahkan ini
   { name: "Employees", href: "/employees", icon: Users, managerOnly: true },
   { name: "Performance", href: "/performance", icon: BarChart3 },
   { name: "KPI Targets", href: "/kpi", icon: Target },
