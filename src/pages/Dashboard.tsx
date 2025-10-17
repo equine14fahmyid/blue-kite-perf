@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Loader2, Users, BarChart3, Target, TrendingUp, AlertCircle } from "lucide-react";
 
-// --- Tipe Data (Tidak ada perubahan) ---
+// --- Tipe Data ---
 type FilterType = 'all' | 'division' | 'team' | 'user';
 type TimeRange = 'today' | 'last7' | 'last30' | 'this_month';
 
@@ -39,7 +39,7 @@ type DashboardStats = {
   };
 };
 
-// --- Fungsi Helper (Tidak ada perubahan) ---
+// --- Fungsi Helper ---
 const getDateRange = (range: TimeRange) => {
   const today = new Date();
   switch (range) {
@@ -62,24 +62,39 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
   const fromISO = from.toISOString();
   const toISO = to.toISOString();
 
-  // 1. Fetch KPI Targets (Tidak ada perubahan)
+  // 1. Fetch KPI Targets based on filter
   let kpiQuery = supabase.from('kpi_targets').select('metric, target_value, period');
   if (filterType !== 'all' && filterId) {
     kpiQuery = kpiQuery.eq('target_for_type', filterType).eq('target_for_id', filterId);
   }
   const { data: targets, error: targetsError } = await kpiQuery;
-  if (targetsError) throw new Error(`Could not fetch KPI targets: ${targetsError.message}`);
+  if (targetsError || !targets) throw new Error(`Could not fetch KPI targets: ${targetsError?.message || 'No data'}`);
 
-  // 2. Fetch Performance Logs (Query diperbaiki)
-  let perfQuery = supabase.from('performance_logs').select('metric, value, date, user_id'); // <--- Hapus join ke users_meta
+  // 2. Fetch Performance Logs based on filter
+  let perfQuery = supabase.from('performance_logs').select('metric, value, date, user_id');
   perfQuery = perfQuery.gte('date', fromISO).lte('date', toISO);
+  
   if (filterType !== 'all' && filterId) {
-    if (filterType === 'user') perfQuery = perfQuery.eq('user_id', filterId);
-    if (filterType === 'division') perfQuery = perfQuery.eq('division', filterId);
-    // Note: team filtering would require a join or a different data structure
+    if (filterType === 'user') {
+      perfQuery = perfQuery.eq('user_id', filterId);
+    }
+    if (filterType === 'division') {
+      perfQuery = perfQuery.eq('division', filterId);
+    }
+    if (filterType === 'team') {
+      // Get user IDs for the selected team
+      const { data: teamMembers, error: teamError } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('team_id', filterId);
+      
+      if (teamError || !teamMembers) throw new Error(`Could not fetch team members: ${teamError?.message || 'No data'}`);
+      const userIdsInTeam = teamMembers.map(m => m.user_id);
+      perfQuery = perfQuery.in('user_id', userIdsInTeam);
+    }
   }
   const { data: performanceLogs, error: logsError } = await perfQuery;
-  if (logsError) throw new Error(`Could not fetch performance logs: ${logsError.message}`);
+  if (logsError || !performanceLogs) throw new Error(`Could not fetch performance logs: ${logsError?.message || 'No data'}`);
 
   // 3. Ambil data user secara terpisah untuk perbandingan
   const userIds = [...new Set(performanceLogs.map(log => log.user_id).filter(Boolean))];
@@ -90,21 +105,21 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
           .select('id, full_name')
           .in('id', userIds);
       if (usersError) console.error("Could not fetch user names for chart");
-      else userNameMap = new Map(users.map(u => [u.id, u.full_name]));
+      else if (users) userNameMap = new Map(users.map(u => [u.id, u.full_name]));
   }
 
-  // 4. Fetch General Summary Stats (Tidak ada perubahan)
+  // 4. Fetch General Summary Stats
   const { data: accounts, error: accountsError } = await supabase.from("accounts").select("followers, status");
-  if (accountsError) throw new Error(`Could not fetch account data: ${accountsError.message}`);
+  if (accountsError || !accounts) throw new Error(`Could not fetch account data: ${accountsError?.message || 'No data'}`);
 
-  // --- Proses Data (Dengan Perbaikan) ---
-  // A. Summary (Tidak ada perubahan)
+  // --- Proses Data ---
+  // A. Summary
   const totalFollowers = accounts.reduce((acc, account) => acc + (account.followers || 0), 0);
   const activeAccounts = accounts.filter(a => a.status === 'active').length;
   const issues = accounts.filter(a => a.status === 'pelanggaran' || a.status === 'banned').length;
   const performanceScore = accounts.length > 0 ? Math.round((activeAccounts / accounts.length) * 100) : 0;
   
-  // B. KPI Progress (Tidak ada perubahan)
+  // B. KPI Progress
   const progressByMetric = performanceLogs.reduce((acc, log) => {
     acc[log.metric] = (acc[log.metric] || 0) + log.value;
     return acc;
@@ -114,7 +129,7 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
   targets.forEach(target => {
     const isDaily = target.period === 'daily';
     const dayDiff = (to.getTime() - from.getTime()) / (1000 * 3600 * 24) + 1;
-    const adjustedTarget = isDaily ? target.target_value * dayDiff : target.target_value;
+    const adjustedTarget = isDaily ? (target.target_value || 0) * dayDiff : (target.target_value || 0);
     
     const progress = progressByMetric[target.metric] || 0;
     kpiGoals[target.metric] = {
@@ -125,18 +140,18 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     };
   });
 
-  // C. Performance Trend (Tidak ada perubahan)
+  // C. Performance Trend
   const trendDataByDate = performanceLogs
     .filter(log => log.metric === 'total_sales' || log.metric === 'video_count')
     .reduce((acc, log) => {
       const date = format(new Date(log.date), "MMM d");
-      if (!acc[date]) acc[date] = { date };
+      if (!acc[date]) acc[date] = { date, total_sales: 0, video_count: 0 };
       acc[date][log.metric] = (acc[date][log.metric] || 0) + log.value;
       return acc;
     }, {} as Record<string, TrendData>);
   const performanceTrend = Object.values(trendDataByDate);
 
-  // D. Comparison Data (Logika diperbaiki)
+  // D. Comparison Data
   const comparisonDataByUser = performanceLogs
     .filter(log => log.metric === 'total_sales')
     .reduce((acc, log) => {
@@ -154,10 +169,6 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     comparisonData,
   };
 }
-
-
-// Sisa komponen (DashboardFilters, Dashboard) tidak perlu diubah.
-// Saya sertakan lagi di bawah ini untuk kelengkapan.
 
 // --- Komponen Filter ---
 function DashboardFilters({
@@ -250,7 +261,6 @@ export default function Dashboard() {
     filterId: null,
   });
 
-  // Jika bukan manager, filter selalu berdasarkan user itu sendiri
   const queryFilters = useMemo(() => {
     if (!isManager && user) {
       return { ...filters, filterType: 'user', filterId: user.id };
@@ -273,6 +283,7 @@ export default function Dashboard() {
   const chartConfig = {
     total_sales: { label: "Sales", color: "hsl(var(--teal))" },
     video_count: { label: "Videos", color: "hsl(var(--gold))" },
+    value: { label: "Sales", color: "hsl(var(--teal))" },
   };
 
   return (
@@ -289,9 +300,9 @@ export default function Dashboard() {
       {isLoading ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : isError ? (
-        <div className="rounded-lg border bg-card p-8 text-center text-destructive"><p>Failed to load dashboard data. Please try again later.</p></div>
+        <div className="rounded-lg border bg-card p-8 text-center text-destructive"><p>Gagal memuat data dasbor. Silakan coba lagi nanti.</p></div>
       ) : !stats ? (
-        <div className="text-center py-16 text-muted-foreground"><p>No data available for the selected filters.</p></div>
+        <div className="text-center py-16 text-muted-foreground"><p>Tidak ada data yang tersedia untuk filter yang dipilih.</p></div>
       ) : (
         <>
           {/* Summary Cards */}
@@ -339,7 +350,7 @@ export default function Dashboard() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Target Progress</CardTitle>
-                <CardDescription>Progress towards your goals for the selected period.</CardDescription>
+                <CardDescription>Progress tujuan Anda untuk periode yang dipilih.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {kpiEntries.length > 0 ? (
@@ -355,7 +366,7 @@ export default function Dashboard() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-muted-foreground py-8">No targets set for this selection.</p>
+                  <p className="text-center text-muted-foreground py-8">Tidak ada target yang ditetapkan untuk pilihan ini.</p>
                 )}
               </CardContent>
             </Card>
@@ -364,7 +375,7 @@ export default function Dashboard() {
             <Card className="lg:col-span-3">
               <CardHeader>
                 <CardTitle>Performance Trend</CardTitle>
-                <CardDescription>Sales and Video Count over the selected period.</CardDescription>
+                <CardDescription>Penjualan dan Jumlah Video selama periode yang dipilih.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -382,11 +393,11 @@ export default function Dashboard() {
           </div>
 
           {/* Comparison Chart */}
-          {isManager && filterType !== 'user' && (
+          {isManager && filterType !== 'user' && stats.comparisonData.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Team Comparison</CardTitle>
-                <CardDescription>Total sales comparison across team members.</CardDescription>
+                <CardDescription>Perbandingan total penjualan antar anggota tim.</CardDescription>
               </CardHeader>
               <CardContent>
                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -395,7 +406,7 @@ export default function Dashboard() {
                       <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={80} />
                       <XAxis type="number" hide />
                       <RechartsTooltip cursor={{ fill: 'hsl(var(--muted))' }} />
-                      <Bar dataKey="value" fill="var(--color-total_sales)" radius={4} />
+                      <Bar dataKey="value" fill="var(--color-value)" radius={4} />
                     </BarChart>
                   </ChartContainer>
               </CardContent>
