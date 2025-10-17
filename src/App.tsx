@@ -20,6 +20,7 @@ import Tools from "./pages/Tools";
 import Products from "./pages/Products";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import DailyReport from "./pages/DailyReport"; // <-- Halaman baru telah diimpor
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,15 @@ function AppRoutes() {
         <ProtectedRoute>
           <Layout>
             <Profile />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Rute baru untuk Laporan Harian */}
+      <Route path="/daily-report" element={
+        <ProtectedRoute>
+          <Layout>
+            <DailyReport />
           </Layout>
         </ProtectedRoute>
       } />
