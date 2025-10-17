@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -14,8 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState } from "react";
-import { AddToolForm } from "@/components/AddToolForm";
+import { AddToolForm } from "@/components/AddToolForm"; // <-- Impor komponen baru
 
 // Tipe data untuk Tool
 type Tool = {
