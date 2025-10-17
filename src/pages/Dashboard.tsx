@@ -1,10 +1,75 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Users, Target, AlertCircle } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Target, AlertCircle, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+// Fungsi untuk mengambil data statistik dari Supabase
+async function fetchDashboardStats() {
+  // Kita akan mengambil beberapa data sekaligus
+  const { data: accounts, error: accountsError } = await supabase
+    .from("accounts")
+    .select("followers, status");
+
+  if (accountsError) {
+    throw new Error("Could not fetch account data");
+  }
+
+  const { data: teamMembers, error: teamMembersError } = await supabase
+    .from("team_members")
+    .select("id");
+
+  if (teamMembersError) {
+    throw new Error("Could not fetch team data");
+  }
+  
+  // Kalkulasi sederhana dari data yang didapat
+  const totalFollowers = accounts.reduce((acc, account) => acc + (account.followers || 0), 0);
+  const activeAccounts = accounts.filter(account => account.status === 'active').length;
+  const issues = accounts.filter(account => account.status === 'pelanggaran' || account.status === 'banned').length;
+  
+  // Skor performa dummy, kita bisa kembangkan nanti
+  const performanceScore = activeAccounts > 0 ? Math.round((activeAccounts / accounts.length) * 100) : 0;
+
+  return { 
+    totalFollowers, 
+    activeAccounts, 
+    performanceScore, 
+    issues,
+    totalTeamMembers: teamMembers.length
+  };
+}
+
 
 export default function Dashboard() {
   const { userMetadata } = useAuth();
+
+  // Menggunakan useQuery untuk mengambil dan menyimpan data
+  const { data: stats, isLoading, isError } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: fetchDashboardStats
+  });
+
+  // Tampilan saat loading
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Tampilan jika terjadi error
+  if (isError) {
+    return (
+       <div className="rounded-lg border bg-card p-8 text-center text-destructive">
+        <p>
+          Failed to load dashboard data. Please try again later.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -23,9 +88,9 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-[hsl(var(--teal))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.totalFollowers.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-[hsl(var(--teal))]">+0%</span> from last month
+              Across all accounts
             </p>
           </CardContent>
         </Card>
@@ -36,9 +101,9 @@ export default function Dashboard() {
             <BarChart3 className="h-4 w-4 text-[hsl(var(--gold))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.activeAccounts}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-[hsl(var(--gold))]">+0%</span> from last month
+              Ready for campaigns
             </p>
           </CardContent>
         </Card>
@@ -49,9 +114,9 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-[hsl(var(--teal))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0%</div>
+            <div className="text-2xl font-bold">{stats.performanceScore}%</div>
             <p className="text-xs text-muted-foreground">
-              Target: 100%
+              Based on account status
             </p>
           </CardContent>
         </Card>
@@ -62,7 +127,7 @@ export default function Dashboard() {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.issues}</div>
             <p className="text-xs text-muted-foreground">
               Accounts needing attention
             </p>
@@ -104,15 +169,15 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Team Members</span>
-                <span className="font-medium">0</span>
+                <span className="font-medium">{stats.totalTeamMembers}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Active Accounts</span>
-                <span className="font-medium">0</span>
+                <span className="font-medium">{stats.activeAccounts}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Avg Performance</span>
-                <span className="font-medium">0%</span>
+                <span className="font-medium">{stats.performanceScore}%</span>
               </div>
             </div>
           </CardContent>
@@ -130,9 +195,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Getting Started Card */}
-      <Card className="border-[hsl(var(--teal))]/20 bg-[hsl(var(--teal))]/5">
+      
+      {/* ... (sisa kodenya tetap sama) ... */}
+       <Card className="border-[hsl(var(--teal))]/20 bg-[hsl(var(--teal))]/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-5 w-5 text-[hsl(var(--teal))]" />
