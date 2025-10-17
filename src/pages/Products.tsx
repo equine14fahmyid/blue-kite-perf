@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, PlusCircle, Sheet } from "lucide-react";
+import { Loader2, PlusCircle, ExternalLink } from "lucide-react";
 
 // Tipe data untuk Product
 type Product = {
@@ -95,7 +95,7 @@ export default function Products() {
                         <CardFooter>
                              <Button variant="outline" size="sm" asChild className="w-full">
                                 <a href={product.spreadsheet_url} target="_blank" rel="noopener noreferrer">
-                                    Open Spreadsheet <Sheet className="ml-2 h-4 w-4" />
+                                    Open Spreadsheet <ExternalLink className="ml-2 h-4 w-4" />
                                 </a>
                              </Button>
                         </CardFooter>
