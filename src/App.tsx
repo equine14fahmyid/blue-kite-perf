@@ -20,8 +20,8 @@ import Tools from "./pages/Tools";
 import Products from "./pages/Products";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
-import DailyReport from "./pages/DailyReport"; // <-- Halaman baru telah diimpor
-import ReportReview from "./pages/ReportReview"; // <-- Impor halaman baru
+import DailyReport from "./pages/DailyReport";
+import ReportReview from "./pages/ReportReview";
 
 const queryClient = new QueryClient();
 
@@ -116,7 +116,6 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      {/* Rute baru untuk Laporan Harian */}
       <Route path="/daily-report" element={
         <ProtectedRoute>
           <Layout>
@@ -124,18 +123,7 @@ function AppRoutes() {
           </Layout>
         </ProtectedRoute>
       } />
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-    <Route path="/daily-report" element={
-        <ProtectedRoute>
-          <Layout>
-            <DailyReport />
-          </Layout>
-        </ProtectedRoute>
-      } />
 
-      {/* Tambahkan Rute Baru untuk Review Laporan */}
       <Route path="/report-review" element={
         <ProtectedRoute requireManager>
           <Layout>
