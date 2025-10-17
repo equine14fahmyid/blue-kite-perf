@@ -6,6 +6,16 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlusCircle, ExternalLink } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import { AddToolForm } from "@/components/AddToolForm";
 
 // Tipe data untuk Tool
 type Tool = {
@@ -46,6 +56,7 @@ async function fetchTools(): Promise<Tool[]> {
 
 export default function Tools() {
   const { isManager } = useAuth();
+  const [isAddToolOpen, setIsAddToolOpen] = useState(false);
   const { data: tools, isLoading, isError } = useQuery({
     queryKey: ['tools'],
     queryFn: fetchTools,
@@ -62,10 +73,23 @@ export default function Tools() {
             </p>
             </div>
             {isManager && (
-                <Button disabled>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Tool
-                </Button>
+                <Dialog open={isAddToolOpen} onOpenChange={setIsAddToolOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Tool
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Add New Tool</DialogTitle>
+                            <DialogDescription>
+                                Add a new tool or resource for your team.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <AddToolForm onSuccess={() => setIsAddToolOpen(false)} />
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
         
