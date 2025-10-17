@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -6,6 +7,15 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlusCircle, ExternalLink } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { AddProductForm } from "@/components/AddProductForm";
 
 // Tipe data untuk Product
 type Product = {
@@ -46,6 +56,7 @@ async function fetchProducts(): Promise<Product[]> {
 
 export default function Products() {
   const { isManager } = useAuth();
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const { data: products, isLoading, isError } = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts,
@@ -62,10 +73,23 @@ export default function Products() {
             </p>
             </div>
             {isManager && (
-                <Button disabled>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Product
-                </Button>
+                <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Product
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Add New Product</DialogTitle>
+                            <DialogDescription>
+                                Add a new product recommendation.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <AddProductForm onSuccess={() => setIsAddProductOpen(false)} />
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
         
