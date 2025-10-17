@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Loader2, Users, BarChart3, Target, TrendingUp, AlertCircle } from "lucide-react";
 
-// --- Tipe Data ---
+// --- Tipe Data (Tidak ada perubahan) ---
 type FilterType = 'all' | 'division' | 'team' | 'user';
 type TimeRange = 'today' | 'last7' | 'last30' | 'this_month';
 
@@ -39,7 +39,7 @@ type DashboardStats = {
   };
 };
 
-// --- Fungsi Helper ---
+// --- Fungsi Helper (Tidak ada perubahan) ---
 const getDateRange = (range: TimeRange) => {
   const today = new Date();
   switch (range) {
@@ -56,22 +56,22 @@ const getDateRange = (range: TimeRange) => {
 
 const formatKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-// --- Fungsi Fetching Utama ---
+// --- Fungsi Fetching Utama (Dengan Perbaikan) ---
 async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRange: TimeRange; filterType: FilterType; filterId: string | null }): Promise<DashboardStats> {
   const { from, to } = getDateRange(timeRange);
   const fromISO = from.toISOString();
   const toISO = to.toISOString();
 
-  // 1. Fetch KPI Targets based on filter
+  // 1. Fetch KPI Targets (Tidak ada perubahan)
   let kpiQuery = supabase.from('kpi_targets').select('metric, target_value, period');
   if (filterType !== 'all' && filterId) {
     kpiQuery = kpiQuery.eq('target_for_type', filterType).eq('target_for_id', filterId);
   }
   const { data: targets, error: targetsError } = await kpiQuery;
-  if (targetsError) throw new Error('Could not fetch KPI targets');
+  if (targetsError) throw new Error(`Could not fetch KPI targets: ${targetsError.message}`);
 
-  // 2. Fetch Performance Logs based on filter
-  let perfQuery = supabase.from('performance_logs').select('metric, value, date, user_id, users_meta(full_name)');
+  // 2. Fetch Performance Logs (Query diperbaiki)
+  let perfQuery = supabase.from('performance_logs').select('metric, value, date, user_id'); // <--- Hapus join ke users_meta
   perfQuery = perfQuery.gte('date', fromISO).lte('date', toISO);
   if (filterType !== 'all' && filterId) {
     if (filterType === 'user') perfQuery = perfQuery.eq('user_id', filterId);
@@ -79,20 +79,32 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     // Note: team filtering would require a join or a different data structure
   }
   const { data: performanceLogs, error: logsError } = await perfQuery;
-  if (logsError) throw new Error('Could not fetch performance logs');
+  if (logsError) throw new Error(`Could not fetch performance logs: ${logsError.message}`);
 
-  // 3. Fetch General Summary Stats (can be optimized)
+  // 3. Ambil data user secara terpisah untuk perbandingan
+  const userIds = [...new Set(performanceLogs.map(log => log.user_id).filter(Boolean))];
+  let userNameMap = new Map<string, string>();
+  if (userIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+          .from('users_meta')
+          .select('id, full_name')
+          .in('id', userIds);
+      if (usersError) console.error("Could not fetch user names for chart");
+      else userNameMap = new Map(users.map(u => [u.id, u.full_name]));
+  }
+
+  // 4. Fetch General Summary Stats (Tidak ada perubahan)
   const { data: accounts, error: accountsError } = await supabase.from("accounts").select("followers, status");
-  if (accountsError) throw new Error("Could not fetch account data");
+  if (accountsError) throw new Error(`Could not fetch account data: ${accountsError.message}`);
 
-  // --- Proses Data ---
-  // A. Summary
+  // --- Proses Data (Dengan Perbaikan) ---
+  // A. Summary (Tidak ada perubahan)
   const totalFollowers = accounts.reduce((acc, account) => acc + (account.followers || 0), 0);
   const activeAccounts = accounts.filter(a => a.status === 'active').length;
   const issues = accounts.filter(a => a.status === 'pelanggaran' || a.status === 'banned').length;
   const performanceScore = accounts.length > 0 ? Math.round((activeAccounts / accounts.length) * 100) : 0;
   
-  // B. KPI Progress
+  // B. KPI Progress (Tidak ada perubahan)
   const progressByMetric = performanceLogs.reduce((acc, log) => {
     acc[log.metric] = (acc[log.metric] || 0) + log.value;
     return acc;
@@ -100,7 +112,6 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
 
   const kpiGoals: Record<string, KpiProgress> = {};
   targets.forEach(target => {
-    // Adjust target based on time range if it's a daily target
     const isDaily = target.period === 'daily';
     const dayDiff = (to.getTime() - from.getTime()) / (1000 * 3600 * 24) + 1;
     const adjustedTarget = isDaily ? target.target_value * dayDiff : target.target_value;
@@ -114,9 +125,9 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     };
   });
 
-  // C. Performance Trend (e.g., total_sales over time)
+  // C. Performance Trend (Tidak ada perubahan)
   const trendDataByDate = performanceLogs
-    .filter(log => log.metric === 'total_sales' || log.metric === 'video_count') // Example metrics
+    .filter(log => log.metric === 'total_sales' || log.metric === 'video_count')
     .reduce((acc, log) => {
       const date = format(new Date(log.date), "MMM d");
       if (!acc[date]) acc[date] = { date };
@@ -125,11 +136,11 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     }, {} as Record<string, TrendData>);
   const performanceTrend = Object.values(trendDataByDate);
 
-  // D. Comparison Data (e.g., total_sales per user)
+  // D. Comparison Data (Logika diperbaiki)
   const comparisonDataByUser = performanceLogs
-    .filter(log => log.metric === 'total_sales') // Example metric
+    .filter(log => log.metric === 'total_sales')
     .reduce((acc, log) => {
-      const name = (log.users_meta as any)?.full_name || 'Unknown';
+      const name = userNameMap.get(log.user_id!) || 'Unknown';
       if (!acc[name]) acc[name] = { name, value: 0 };
       acc[name].value += log.value;
       return acc;
@@ -143,6 +154,10 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
     comparisonData,
   };
 }
+
+
+// Sisa komponen (DashboardFilters, Dashboard) tidak perlu diubah.
+// Saya sertakan lagi di bawah ini untuk kelengkapan.
 
 // --- Komponen Filter ---
 function DashboardFilters({
@@ -244,11 +259,15 @@ export default function Dashboard() {
   }, [filters, isManager, user]);
 
 
-  const { data: stats, isLoading, isError } = useQuery({
+  const { data: stats, isLoading, isError, error } = useQuery({
     queryKey: ['dashboardData', queryFilters],
     queryFn: () => fetchDashboardData(queryFilters),
     enabled: !!user,
   });
+
+  if (isError) {
+      console.error("Dashboard fetch error:", error);
+  }
 
   const kpiEntries = stats ? Object.values(stats.kpiGoals) : [];
   const chartConfig = {
@@ -373,7 +392,7 @@ export default function Dashboard() {
                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
                     <BarChart data={stats.comparisonData} layout="vertical" margin={{ left: 20 }}>
                       <CartesianGrid horizontal={false} />
-                      <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} />
+                      <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={80} />
                       <XAxis type="number" hide />
                       <RechartsTooltip cursor={{ fill: 'hsl(var(--muted))' }} />
                       <Bar dataKey="value" fill="var(--color-total_sales)" radius={4} />
