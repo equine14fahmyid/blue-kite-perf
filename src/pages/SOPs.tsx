@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AddSopForm } from "@/components/AddSopForm"; // <-- Impor baru
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlusCircle, FileText } from "lucide-react";
@@ -77,23 +78,25 @@ export default function SOPs() {
             {isManager && (
                  <Dialog open={isAddSopOpen} onOpenChange={setIsAddSopOpen}>
                     <DialogTrigger asChild>
-                        <Button disabled>
+                        <Button>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add SOP
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle>Add New SOP</DialogTitle>
                             <DialogDescription>
-                                (Form will be here)
+                                Upload a new standard operating procedure document.
                             </DialogDescription>
                         </DialogHeader>
+                        <AddSopForm onSuccess={() => setIsAddSopOpen(false)} />
                     </DialogContent>
                 </Dialog>
             )}
         </div>
         
+        {/* ... sisa kode tetap sama ... */}
         {isLoading ? (
             <div className="flex justify-center items-center py-24">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
