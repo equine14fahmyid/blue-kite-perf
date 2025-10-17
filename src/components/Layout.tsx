@@ -24,7 +24,8 @@ import {
   Wrench,
   Package,
   Menu,
-  X
+  X,
+  ClipboardEdit, // <-- Impor ikon baru
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -36,6 +37,7 @@ interface LayoutProps {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Laporan Harian", href: "/daily-report", icon: ClipboardEdit, managerOnly: false },
   { name: "Employees", href: "/employees", icon: Users, managerOnly: true },
   { name: "Performance", href: "/performance", icon: BarChart3 },
   { name: "KPI Targets", href: "/kpi", icon: Target },
