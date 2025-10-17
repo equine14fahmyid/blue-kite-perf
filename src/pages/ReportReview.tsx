@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Eye } from "lucide-react";
@@ -21,37 +21,64 @@ type ReportWithUser = {
   user_name: string;
 };
 
-// Fungsi untuk mengambil laporan dari Supabase
+// --- PERUBAHAN DI SINI ---
+// Mengambil semua log yang relevan, bukan hanya yang "daily_report"
 async function fetchReportsForManager(): Promise<ReportWithUser[]> {
+  const { data: users, error: usersError } = await supabase
+    .from("users_meta")
+    .select("id, full_name");
+
+  if (usersError) {
+    console.error("Error fetching users:", usersError);
+    throw new Error("Failed to fetch users");
+  }
+  const userNameMap = new Map(users.map(u => [u.id, u.full_name]));
+
+  // Mengambil semua log, dikelompokkan berdasarkan tanggal dan user
   const { data, error } = await supabase
     .from("performance_logs")
-    .select(`
-      id,
-      date,
-      meta,
-      created_at,
-      user_id,
-      division,
-      users_meta (
-        full_name
-      )
-    `)
-    .eq("metric", "daily_report")
+    .select(`*`)
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching reports:", error);
     throw new Error("Failed to fetch reports for manager");
   }
+  
+  // Mengelompokkan log berdasarkan tanggal dan user_id
+  const reportsByDateAndUser = data.reduce((acc, log) => {
+    const key = `${log.date}-${log.user_id}`;
+    if (!acc[key]) {
+      acc[key] = {
+        id: `${log.date}-${log.user_id}`, // Membuat ID unik
+        date: log.date,
+        created_at: log.created_at,
+        user_id: log.user_id,
+        division: log.division,
+        user_name: userNameMap.get(log.user_id) || "Unknown User",
+        meta: {},
+      };
+    }
+    // Gabungkan meta dari semua log untuk user dan tanggal yang sama
+    if (log.meta) {
+      if(log.meta.original_value) {
+         acc[key].meta[log.metric] = log.meta.original_value;
+      }
+      if(log.meta.notes) {
+        acc[key].meta.notes = log.meta.notes;
+      }
+    }
+    // Jika tidak ada di meta, gunakan value
+    if (!acc[key].meta[log.metric] && log.value > 0) {
+        acc[key].meta[log.metric] = log.value;
+    }
 
-  // Mengubah format data agar lebih mudah digunakan
-  const formattedData = data.map((report: any) => ({
-    ...report,
-    user_name: report.users_meta?.full_name || "Unknown User",
-  }));
+    return acc;
+  }, {} as Record<string, ReportWithUser>);
 
-  return formattedData;
+  return Object.values(reportsByDateAndUser);
 }
+
 
 // Fungsi untuk format teks agar lebih mudah dibaca
 const formatKey = (key: string) => {
@@ -143,15 +170,17 @@ export default function ReportReview() {
             </p>
           </DialogHeader>
           <div className="mt-4 space-y-4">
-            {selectedReport?.meta && Object.entries(selectedReport.meta).map(([key, value]) => (
-              <div key={key} className="grid grid-cols-2 gap-2 text-sm">
-                <span className="font-semibold text-muted-foreground">{formatKey(key)}:</span>
-                <span>{value}</span>
-              </div>
+            {selectedReport?.meta && Object.entries(selectedReport.meta)
+              .filter(([key]) => key !== 'notes') // Jangan tampilkan notes di sini
+              .map(([key, value]) => (
+                <div key={key} className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="font-semibold text-muted-foreground">{formatKey(key)}:</span>
+                  <span>{String(value)}</span>
+                </div>
             ))}
-             <div className="grid grid-cols-2 gap-2 text-sm">
+             <div className="space-y-1 text-sm">
                 <span className="font-semibold text-muted-foreground">Catatan:</span>
-                <span>{selectedReport?.meta?.notes || "-"}</span>
+                <p className="pt-1">{selectedReport?.meta?.notes || "-"}</p>
               </div>
           </div>
         </DialogContent>
