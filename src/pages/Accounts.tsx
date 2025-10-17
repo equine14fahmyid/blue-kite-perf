@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AddAccountForm } from "@/components/AddAccountForm"; // <-- Import komponen baru
+import { AddAccountForm } from "@/components/AddAccountForm";
 
 import {
   Table,
@@ -20,10 +20,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 // Tipe data untuk sebuah akun, sesuai dengan skema Supabase Anda
 type Account = {
@@ -35,12 +54,11 @@ type Account = {
   keranjang_kuning: boolean | null;
 };
 
-// Fungsi untuk mengambil semua data akun
 async function fetchAccounts(): Promise<Account[]> {
   const { data, error } = await supabase
     .from("accounts")
     .select("id, platform, username, followers, status, keranjang_kuning")
-    .order('created_at', { ascending: false }); // Urutkan berdasarkan yang terbaru
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error("Error fetching accounts:", error);
@@ -50,7 +68,6 @@ async function fetchAccounts(): Promise<Account[]> {
   return data;
 }
 
-// Fungsi untuk memformat status menjadi lebih mudah dibaca
 const formatStatus = (status: Account['status']) => {
   switch (status) {
     case 'active':
@@ -68,9 +85,30 @@ const formatStatus = (status: Account['status']) => {
 
 export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const queryClient = useQueryClient();
+
   const { data: accounts, isLoading, isError } = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const { error } = await supabase.from('accounts').delete().eq('id', accountId);
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Akun berhasil dihapus.");
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setAccountToDelete(null); // Tutup dialog konfirmasi
+    },
+    onError: (error) => {
+      toast.error(`Gagal menghapus akun: ${error.message}`);
+      setAccountToDelete(null);
+    }
   });
 
   return (
@@ -127,6 +165,7 @@ export default function Accounts() {
                     <TableHead>Followers</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Keranjang Kuning</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -152,11 +191,36 @@ export default function Accounts() {
                             {account.keranjang_kuning ? 'Yes' : 'No'}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                // onClick={() => handleEdit(account)} // Akan kita implementasikan
+                              >
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onSelect={() => setAccountToDelete(account)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={6} className="h-24 text-center">
                         No accounts found. Click "Add Account" to get started.
                       </TableCell>
                     </TableRow>
@@ -167,6 +231,38 @@ export default function Accounts() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Alert Dialog untuk Konfirmasi Hapus */}
+      <AlertDialog
+        open={!!accountToDelete}
+        onOpenChange={(isOpen) => !isOpen && setAccountToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account for{' '}
+              <span className="font-bold">{accountToDelete?.username}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (accountToDelete) {
+                  deleteMutation.mutate(accountToDelete.id);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : "Continue"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </ProtectedRoute>
   );
 }
