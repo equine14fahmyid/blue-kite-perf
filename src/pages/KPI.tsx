@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AddKpiForm } from "@/components/AddKpiForm"; // <-- Impor baru
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -13,6 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, PlusCircle, User, Users, Building } from "lucide-react";
@@ -67,7 +76,7 @@ async function fetchKpiTargets(): Promise<KpiTarget[]> {
     } else if (target.target_for_type === "team") {
       target_name = teamNameMap.get(target.target_for_id) || "Unknown Team";
     } else if (target.target_for_type === "division") {
-        target_name = target.target_for_id.replace("_", " "); // Asumsi ID divisi adalah namanya
+        target_name = target.target_for_id.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
     }
     return { ...target, target_name };
   });
@@ -83,6 +92,7 @@ const TargetIcon = ({ type }: { type: KpiTarget['target_for_type'] }) => {
 };
 
 export default function KPI() {
+  const [isAddTargetOpen, setIsAddTargetOpen] = useState(false);
   const { data: kpiTargets, isLoading, isError } = useQuery({
     queryKey: ['kpiTargets'],
     queryFn: fetchKpiTargets,
@@ -98,13 +108,27 @@ export default function KPI() {
                 Set and track key performance indicators for your team.
             </p>
             </div>
-            <Button disabled>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Target
-            </Button>
+            <Dialog open={isAddTargetOpen} onOpenChange={setIsAddTargetOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Target
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Create New KPI Target</DialogTitle>
+                        <DialogDescription>
+                            Set a new performance goal for a user, team, or division.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <AddKpiForm onSuccess={() => setIsAddTargetOpen(false)} />
+                </DialogContent>
+            </Dialog>
         </div>
         
         <Card>
+            {/* ... sisa kode Card tetap sama ... */}
             <CardHeader>
                 <CardTitle>Active KPI Targets</CardTitle>
                 <CardDescription>
@@ -155,7 +179,7 @@ export default function KPI() {
                     ) : (
                         <TableRow>
                         <TableCell colSpan={5} className="h-24 text-center">
-                            No KPI targets found.
+                            No KPI targets found. Click "Add Target" to get started.
                         </TableCell>
                         </TableRow>
                     )}
