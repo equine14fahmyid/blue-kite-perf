@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AddProductForm } from "@/components/AddProductForm";
+import { AddProductForm } from "@/components/AddProductForm"; // <-- Impor komponen baru
 
 // Tipe data untuk Product
 type Product = {
