@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { AddAccountForm } from "@/components/AddAccountForm"; // <-- Import komponen baru
+
 import {
   Table,
   TableBody,
@@ -9,6 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +39,8 @@ type Account = {
 async function fetchAccounts(): Promise<Account[]> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("id, platform, username, followers, status, keranjang_kuning");
+    .select("id, platform, username, followers, status, keranjang_kuning")
+    .order('created_at', { ascending: false }); // Urutkan berdasarkan yang terbaru
 
   if (error) {
     console.error("Error fetching accounts:", error);
@@ -54,8 +66,8 @@ const formatStatus = (status: Account['status']) => {
   }
 };
 
-
 export default function Accounts() {
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const { data: accounts, isLoading, isError } = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts
@@ -71,10 +83,23 @@ export default function Accounts() {
               Manage affiliate accounts securely
             </p>
           </div>
-          <Button>
-             <PlusCircle className="mr-2 h-4 w-4" />
-             Add Account
-          </Button>
+          <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add New Account</DialogTitle>
+                <DialogDescription>
+                  Fill in the details for the new affiliate account.
+                </DialogDescription>
+              </DialogHeader>
+              <AddAccountForm onSuccess={() => setIsAddAccountOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
         
         <Card>
@@ -132,7 +157,7 @@ export default function Accounts() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
-                        No accounts found.
+                        No accounts found. Click "Add Account" to get started.
                       </TableCell>
                     </TableRow>
                   )}
