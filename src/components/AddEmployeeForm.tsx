@@ -62,7 +62,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
           full_name: meta.full_name,
           username: meta.username,
           role: meta.role,
-          // kita perlu menambahkan division ke meta
+          division: meta.division,
       });
       if (error) {
         throw new Error(error.message);

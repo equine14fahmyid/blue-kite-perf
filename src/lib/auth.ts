@@ -25,6 +25,7 @@ export async function signUp(email: string, password: string, metadata: {
   full_name: string;
   username: string;
   role?: UserRole;
+  division?: Division;
 }) {
   const redirectUrl = `${window.location.origin}/`;
   
