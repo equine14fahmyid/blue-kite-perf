@@ -57,7 +57,21 @@ export function AddAccountForm({ onSuccess }: AddAccountFormProps) {
 
   const mutation = useMutation({
     mutationFn: async (newAccount: AccountFormValues) => {
-      const { error } = await supabase.from("accounts").insert([newAccount]);
+      const dataToInsert: {
+        username: string;
+        platform: "tiktok" | "shopee" | "other";
+        account_type: "affiliate" | "seller";
+        followers?: number;
+        keranjang_kuning?: boolean;
+      } = {
+        username: newAccount.username,
+        platform: newAccount.platform,
+        account_type: newAccount.account_type,
+        followers: newAccount.followers,
+        keranjang_kuning: newAccount.keranjang_kuning,
+      };
+      
+      const { error } = await supabase.from("accounts").insert([dataToInsert]);
       if (error) {
         throw new Error(error.message);
       }

@@ -92,15 +92,30 @@ export function AddKpiForm({ onSuccess }: AddKpiFormProps) {
 
   const mutation = useMutation({
     mutationFn: async (values: KpiFormValues) => {
+        if (!user) throw new Error("User not authenticated");
+        
         const now = new Date();
         const startDate = startOfMonth(now);
         const endDate = endOfMonth(now);
 
-        const dataToInsert = {
-            ...values,
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
-            created_by: user?.id,
+        const dataToInsert: {
+          target_for_type: "user" | "team" | "division";
+          target_for_id: string;
+          metric: string;
+          target_value: number;
+          period: "daily" | "monthly";
+          start_date: string;
+          end_date: string;
+          created_by: string;
+        } = {
+          target_for_type: values.target_for_type,
+          target_for_id: values.target_for_id,
+          metric: values.metric,
+          target_value: values.target_value,
+          period: values.period,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          created_by: user.id,
         };
 
       const { error } = await supabase.from("kpi_targets").insert([dataToInsert]);

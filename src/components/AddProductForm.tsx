@@ -49,8 +49,15 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     mutationFn: async (values: ProductFormValues) => {
       if (!user) throw new Error("User not authenticated");
 
-      const dataToInsert = {
-        ...values,
+      const dataToInsert: {
+        title: string;
+        spreadsheet_url: string;
+        description?: string;
+        created_by: string;
+      } = {
+        title: values.title,
+        spreadsheet_url: values.spreadsheet_url,
+        description: values.description,
         created_by: user.id,
       };
 

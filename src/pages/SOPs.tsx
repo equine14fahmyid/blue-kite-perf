@@ -124,11 +124,17 @@ export default function SOPs() {
                              <div className="flex items-center gap-2">
                                 {sop.file_path && <FileText className="h-5 w-5 text-blue-500" />}
                              </div>
-                             <Button variant="outline" size="sm" asChild>
-                                <a href={sop.file_path || "#"} target="_blank" rel="noopener noreferrer" disabled={!sop.file_path}>
-                                    View Document
-                                </a>
-                             </Button>
+                             {sop.file_path ? (
+                               <Button variant="outline" size="sm" asChild>
+                                 <a href={sop.file_path} target="_blank" rel="noopener noreferrer">
+                                   View Document
+                                 </a>
+                               </Button>
+                             ) : (
+                               <Button variant="outline" size="sm" disabled>
+                                 View Document
+                               </Button>
+                             )}
                         </CardFooter>
                     </Card>
                 ))}

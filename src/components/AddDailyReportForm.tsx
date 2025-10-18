@@ -104,7 +104,10 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
                     division: division,
                     metric: 'daily_notes',
                     value: 0,
-                    meta: { notes },
+                    meta: { 
+                      original_value: 0,
+                      notes 
+                    },
                  });
             }
 
@@ -114,7 +117,13 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
                 return;
             }
 
-            const { error } = await supabase.from("performance_logs").insert(dataToInsert);
+            const { error } = await supabase.from("performance_logs").insert(
+              dataToInsert.map(entry => ({
+                ...entry,
+                value: Number(entry.value) || 0,
+                meta: entry.meta as any,
+              }))
+            );
 
             if (error) {
                 throw new Error(error.message);
@@ -143,9 +152,9 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
             case "konten_kreator":
                 return (
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="video_count"
+              <FormField
+                control={form.control}
+                name={"video_count" as "notes"}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Jumlah Video</FormLabel>
@@ -156,9 +165,9 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="post_count"
+              <FormField
+                control={form.control}
+                name={"post_count" as "notes"}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Jumlah Postingan</FormLabel>
@@ -174,9 +183,9 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
             case "host_live":
                 return (
                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="live_duration_hours"
+              <FormField
+                control={form.control}
+                name={"live_duration_hours" as "notes"}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Durasi Live (Jam)</FormLabel>
@@ -187,9 +196,9 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="total_sales"
+              <FormField
+                control={form.control}
+                name={"total_sales" as "notes"}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Total Penjualan (Rp)</FormLabel>
@@ -204,9 +213,9 @@ export function AddDailyReportForm({ onSuccess }: AddDailyReportFormProps) {
                 );
             case "model":
                  return (
-                    <FormField
-                        control={form.control}
-                        name="project_name"
+          <FormField
+            control={form.control}
+            name={"project_name" as "notes"}
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Nama Proyek/Endorsement</FormLabel>

@@ -60,12 +60,13 @@ async function fetchReportsForManager(): Promise<ReportWithUser[]> {
       };
     }
     // Gabungkan meta dari semua log untuk user dan tanggal yang sama
-    if (log.meta) {
-      if(log.meta.original_value) {
-         acc[key].meta[log.metric] = log.meta.original_value;
+    if (log.meta && typeof log.meta === 'object') {
+      const metaObj = log.meta as Record<string, any>;
+      if(metaObj.original_value !== undefined) {
+         acc[key].meta[log.metric] = metaObj.original_value;
       }
-      if(log.meta.notes) {
-        acc[key].meta.notes = log.meta.notes;
+      if(metaObj.notes) {
+        acc[key].meta.notes = metaObj.notes;
       }
     }
     // Jika tidak ada di meta, gunakan value

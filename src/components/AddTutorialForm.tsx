@@ -55,8 +55,19 @@ export function AddTutorialForm({ onSuccess }: AddTutorialFormProps) {
     mutationFn: async (values: TutorialFormValues) => {
       if (!user) throw new Error("User not authenticated");
 
-      const dataToInsert = {
-        ...values,
+      const dataToInsert: {
+        title: string;
+        body?: string;
+        youtube_url?: string;
+        file_path?: string;
+        is_public: boolean;
+        created_by: string;
+      } = {
+        title: values.title,
+        body: values.body,
+        youtube_url: values.youtube_url,
+        file_path: values.file_path,
+        is_public: values.is_public,
         created_by: user.id,
       };
 

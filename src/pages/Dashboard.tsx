@@ -79,7 +79,7 @@ async function fetchDashboardData({ timeRange, filterType, filterId }: { timeRan
       perfQuery = perfQuery.eq('user_id', filterId);
     }
     if (filterType === 'division') {
-      perfQuery = perfQuery.eq('division', filterId);
+      perfQuery = perfQuery.eq('division', filterId as "host_live" | "konten_kreator" | "manager" | "model");
     }
     if (filterType === 'team') {
       // Get user IDs for the selected team
@@ -271,7 +271,11 @@ export default function Dashboard() {
 
   const { data: stats, isLoading, isError, error } = useQuery({
     queryKey: ['dashboardData', queryFilters],
-    queryFn: () => fetchDashboardData(queryFilters),
+    queryFn: () => fetchDashboardData({
+      timeRange: queryFilters.timeRange,
+      filterType: queryFilters.filterType as FilterType,
+      filterId: queryFilters.filterId,
+    }),
     enabled: !!user,
   });
 
@@ -393,7 +397,7 @@ export default function Dashboard() {
           </div>
 
           {/* Comparison Chart */}
-          {isManager && filterType !== 'user' && stats.comparisonData.length > 0 && (
+          {isManager && filters.filterType !== 'user' && stats.comparisonData.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Team Comparison</CardTitle>

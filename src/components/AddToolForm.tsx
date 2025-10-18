@@ -49,8 +49,15 @@ export function AddToolForm({ onSuccess }: AddToolFormProps) {
     mutationFn: async (values: ToolFormValues) => {
       if (!user) throw new Error("User not authenticated");
 
-      const dataToInsert = {
-        ...values,
+      const dataToInsert: {
+        title: string;
+        url: string;
+        description?: string;
+        created_by: string;
+      } = {
+        title: values.title,
+        url: values.url,
+        description: values.description,
         created_by: user.id,
       };
 

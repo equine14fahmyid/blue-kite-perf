@@ -49,8 +49,15 @@ export function AddSopForm({ onSuccess }: AddSopFormProps) {
     mutationFn: async (values: SopFormValues) => {
       if (!user) throw new Error("User not authenticated");
 
-      const dataToInsert = {
-        ...values,
+      const dataToInsert: {
+        title: string;
+        description?: string;
+        file_path?: string;
+        created_by: string;
+      } = {
+        title: values.title,
+        description: values.description,
+        file_path: values.file_path,
         created_by: user.id,
       };
 
